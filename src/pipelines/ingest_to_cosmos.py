@@ -83,23 +83,42 @@ def ensure_string_ids(item: dict[str, Any]) -> dict[str, Any]:
 
 def get_request_embedding(text: str) -> list[float] | None:
     """Call embedding endpoint and return the embedding vector or None on failure."""
-    if not EMBEDDING_ENDPOINT or not EMBEDDING_DEPLOYMENT or not EMBEDDING_API_KEY or not EMBEDDING_API_VERSION:
-        logger.error("Embedding env vars not fully set; failing embedding generation.")
+    if not EMBEDDING_ENDPOINT or not EMBEDDING_DEPLOYMENT or not EMBEDDING_API_VERSION:
+        logger.error("Embedding env vars not fully set (endpoint, deployment, or API version missing).")
         return None
 
     url = EMBEDDING_ENDPOINT.rstrip("/") + f"/openai/deployments/{EMBEDDING_DEPLOYMENT}/embeddings?api-version={EMBEDDING_API_VERSION}"
-    headers = {
-        "Content-Type": "application/json",
-        "api-key": EMBEDDING_API_KEY,
-    }
+    
+    # Try Managed Identity first, fallback to API key
+    headers = {"Content-Type": "application/json"}
+    
+    if EMBEDDING_API_KEY:
+        # Use API key if provided
+        headers["api-key"] = EMBEDDING_API_KEY
+        logger.info("Using API key authentication for embeddings")
+    else:
+        # Use Managed Identity / DefaultAzureCredential
+        try:
+            logger.info("Using Managed Identity authentication for embeddings")
+            credential = DefaultAzureCredential()
+            token = credential.get_token("https://cognitiveservices.azure.com/.default")
+            headers["Authorization"] = f"Bearer {token.token}"
+        except Exception as ex:
+            logger.error("Failed to get Managed Identity token for embeddings: %s", ex)
+            return None
+    
     payload = {"input": text}
 
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    # Expecting Azure OpenAI style response: {"data":[{"embedding": [...]}, ...]}
-    embedding = data.get("data", [{}])[0].get("embedding")
-    return embedding
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        # Expecting Azure OpenAI style response: {"data":[{"embedding": [...]}, ...]}
+        embedding = data.get("data", [{}])[0].get("embedding")
+        return embedding
+    except Exception as ex:
+        logger.error("Failed to get embedding: %s", ex)
+        return None
 
 
 def main() -> None:

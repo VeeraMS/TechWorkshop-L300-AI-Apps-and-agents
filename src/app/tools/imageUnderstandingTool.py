@@ -2,9 +2,10 @@ import base64
 from mimetypes import guess_type
 import os  
 import base64
-from openai import AzureOpenAI  
 from dotenv import load_dotenv
 load_dotenv()
+
+from utils.azure_client_utils import create_azure_openai_client
 
 azure_deployment = os.environ.get("gpt_deployment")
 api_version = os.environ.get("gpt_api_version")
@@ -12,11 +13,10 @@ azure_endpoint = os.environ.get("gpt_endpoint")
 api_key = os.environ.get("gpt_api_key")
 gpt_deployment = os.environ.get("gpt_deployment")
 
-az_model_client = AzureOpenAI(
-    azure_deployment=azure_deployment,
+az_model_client = create_azure_openai_client(
+    endpoint=azure_endpoint,
     api_version=api_version,
-    azure_endpoint=azure_endpoint,
-    api_key=api_key,
+    api_key=api_key
 )
 
 

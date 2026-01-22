@@ -55,14 +55,26 @@ def get_cosmos_client(endpoint: str | None, key: str | None = None):
 
 def get_request_embedding(text: str) -> list[float] | None:
     """Call embedding endpoint and return the embedding vector or None on failure."""
-    if not EMBEDDING_ENDPOINT or not EMBEDDING_DEPLOYMENT or not EMBEDDING_API_KEY or not EMBEDDING_API_VERSION:
-        raise ValueError("Embedding endpoint configuration missing. Set EMBEDDING_ENDPOINT, EMBEDDING_DEPLOYMENT, EMBEDDING_API_KEY, EMBEDDING_API_VERSION")
+    if not EMBEDDING_ENDPOINT or not EMBEDDING_DEPLOYMENT or not EMBEDDING_API_VERSION:
+        raise ValueError("Embedding endpoint configuration missing. Set EMBEDDING_ENDPOINT, EMBEDDING_DEPLOYMENT, EMBEDDING_API_VERSION")
 
     url = EMBEDDING_ENDPOINT.rstrip("/") + f"/openai/deployments/{EMBEDDING_DEPLOYMENT}/embeddings?api-version={EMBEDDING_API_VERSION}"
-    headers = {
-        "Content-Type": "application/json",
-        "api-key": EMBEDDING_API_KEY,
-    }
+    
+    # Use MI authentication if API key not provided or is empty
+    if EMBEDDING_API_KEY and EMBEDDING_API_KEY.strip():
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": EMBEDDING_API_KEY,
+        }
+    else:
+        # Use Managed Identity / Entra ID authentication
+        credential = DefaultAzureCredential()
+        token = credential.get_token("https://cognitiveservices.azure.com/.default")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token.token}",
+        }
+    
     payload = {"input": text}
 
     resp = requests.post(url, headers=headers, json=payload, timeout=30)

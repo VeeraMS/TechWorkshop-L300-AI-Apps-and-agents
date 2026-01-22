@@ -1,22 +1,23 @@
 import os
 import pandas as pd
-from openai import AzureOpenAI
 from dotenv import load_dotenv
 load_dotenv()
+
+from utils.azure_client_utils import create_azure_openai_client
 
 from opentelemetry import trace
 from azure.monitor.opentelemetry import configure_azure_monitor
 from azure.ai.agents.telemetry import trace_function
 import time
-# from opentelemetry.instrumentation.openai_v2 import OpenAIInstrumentor
+from opentelemetry.instrumentation.openai_v2 import OpenAIInstrumentor
 
 # Enable Azure Monitor tracing
 application_insights_connection_string = os.environ["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-# configure_azure_monitor(connection_string=application_insights_connection_string)
-# OpenAIInstrumentor().instrument()
+configure_azure_monitor(connection_string=application_insights_connection_string)
+OpenAIInstrumentor().instrument()
 
-# scenario = os.path.basename(__file__)
-# tracer = trace.get_tracer(__name__)
+scenario = os.path.basename(__file__)
+tracer = trace.get_tracer(__name__)
 
 #Azure OpenAI
 endpoint = os.getenv("gpt_endpoint")
@@ -130,10 +131,10 @@ def calculate_discount(CustomerID):
             float: Discount amount to be applied based on the business logic.
         """
         # Initialize client
-        client = AzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=api_key,
+        client = create_azure_openai_client(
+            endpoint=endpoint,
             api_version=api_version,
+            api_key=api_key
         )
         # print(f"loyalty_info is:{loyalty_info}, invoice value: {InvoiceValue} and transaction_info is:{transaction_info}")
         prompt= "Bruno's total transaction price in this year"+ transaction_info + "and his data"+str(loyalty_info)
